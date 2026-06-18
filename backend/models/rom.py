@@ -83,6 +83,7 @@ class RomFile(BaseModel):
     file_path: Mapped[str] = mapped_column(String(length=FILE_PATH_MAX_LENGTH))
     file_size_bytes: Mapped[int] = mapped_column(BigInteger(), default=0)
     last_modified: Mapped[float | None] = mapped_column(default=None)
+    library_id: Mapped[str | None] = mapped_column(String(length=12), nullable=True)
     crc_hash: Mapped[str | None] = mapped_column(String(100))
     md5_hash: Mapped[str | None] = mapped_column(String(100))
     sha1_hash: Mapped[str | None] = mapped_column(String(100))
@@ -201,6 +202,8 @@ class Rom(BaseModel):
     fs_extension: Mapped[str] = mapped_column(String(length=FILE_EXTENSION_MAX_LENGTH))
     fs_path: Mapped[str] = mapped_column(String(length=FILE_PATH_MAX_LENGTH))
     fs_size_bytes: Mapped[int] = mapped_column(BigInteger(), default=0)
+
+    library_id: Mapped[str | None] = mapped_column(String(length=12), nullable=True)
 
     name: Mapped[str | None] = mapped_column(String(length=350))
     slug: Mapped[str | None] = mapped_column(String(length=400))

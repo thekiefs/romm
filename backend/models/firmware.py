@@ -40,6 +40,8 @@ class Firmware(BaseModel):
     file_path: Mapped[str] = mapped_column(String(length=FILE_PATH_MAX_LENGTH))
     file_size_bytes: Mapped[int] = mapped_column(BigInteger(), default=0)
 
+    library_id: Mapped[str | None] = mapped_column(String(length=12), nullable=True)
+
     crc_hash: Mapped[str] = mapped_column(String(length=100))
     md5_hash: Mapped[str] = mapped_column(String(length=100))
     sha1_hash: Mapped[str] = mapped_column(String(length=100))

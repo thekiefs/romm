@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Final, NotRequired, TypedDict
+from typing import Any, Final, NotRequired, TypedDict
 
 import pydash
 import yaml
@@ -134,6 +134,7 @@ class Config:
     SCAN_MEDIA: list[str]
     GAMELIST_MEDIA_THUMBNAIL: MetadataMediaType
     GAMELIST_MEDIA_IMAGE: MetadataMediaType
+    LIBRARIES: list[dict[str, Any]]
 
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -446,7 +447,35 @@ class ConfigManager:
             PEGASUS_AUTO_EXPORT_ON_SCAN=pydash.get(
                 self._raw_config, "scan.pegasus.export", False
             ),
+            LIBRARIES=self._parse_libraries(),
         )
+
+    def _parse_libraries(self) -> list[dict[str, Any]]:
+        import hashlib
+        raw_libraries = pydash.get(self._raw_config, "libraries", None)
+        libraries = []
+
+        if raw_libraries is None:
+            raw_libraries = [{
+                "name": "Default",
+                "path": str(Path(LIBRARY_BASE_PATH)),
+                "structure": ""
+            }]
+
+        for lib in raw_libraries:
+            path_val = lib.get("path", "")
+            abs_path = os.path.abspath(path_val)
+            library_id = hashlib.sha1(abs_path.encode("utf-8")).hexdigest()[:12]
+
+            libraries.append({
+                "id": library_id,
+                "name": lib.get("name", "Unnamed Library"),
+                "path": abs_path,
+                "structure": lib.get("structure", ""),
+                "platforms": lib.get("platforms", {})
+            })
+
+        return libraries
 
     def _get_ejs_controls(self) -> dict[str, EjsControls]:
         """Get EJS controls with default player entries for each core"""
@@ -482,6 +511,39 @@ class ConfigManager:
 
     def _validate_config(self):
         """Validates the config.yml file"""
+        seen_ids = {}
+        for lib in self.config.LIBRARIES:
+            if not isinstance(lib.get("name"), str):
+                log.critical("Invalid config.yml: libraries name must be a string")
+                sys.exit(3)
+            if not isinstance(lib.get("path"), str) or not lib.get("path"):
+                log.critical("Invalid config.yml: libraries path must be a non-empty string")
+                sys.exit(3)
+            if not isinstance(lib.get("structure"), str):
+                log.critical("Invalid config.yml: libraries structure must be a string")
+                sys.exit(3)
+            if not isinstance(lib.get("platforms"), dict):
+                log.critical("Invalid config.yml: libraries platforms must be a dictionary")
+                sys.exit(3)
+
+            lid = lib["id"]
+            if lid in seen_ids:
+                log.critical(
+                    f"Invalid config.yml: Duplicate library path detected. "
+                    f"Library '{lib['name']}' and '{seen_ids[lid]}' both resolve to ID {lid} "
+                    f"(Path: {lib['path']})."
+                )
+                sys.exit(3)
+            seen_ids[lid] = lib["name"]
+
+            for p_key in lib["platforms"].keys():
+                if p_key in self.config.PLATFORMS_BINDING:
+                    log.critical(
+                        f"Invalid config.yml: Library '{lib['name']}' defines a platform override "
+                        f"for '{p_key}' which conflicts with a global system.platforms override."
+                    )
+                    sys.exit(3)
+
         if not isinstance(self.config.EXCLUDED_PLATFORMS, list):
             log.critical("Invalid config.yml: exclude.platforms must be a list")
             sys.exit(3)
