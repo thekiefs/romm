@@ -168,14 +168,6 @@ class FSRomsHandler(FSHandler):
     def __init__(self) -> None:
         super().__init__(base_path=LIBRARY_BASE_PATH)
 
-    def get_roms_fs_structure(self, fs_slug: str) -> str:
-        cnfg = cm.get_config()
-        return (
-            f"{fs_slug}/{cnfg.ROMS_FOLDER_NAME}"
-            if cnfg.has_structure_path_b
-            else f"{cnfg.ROMS_FOLDER_NAME}/{fs_slug}"
-        )
-
     def parse_tags(self, fs_name: str) -> ParsedTags:
         tags = [
             chunk.strip()
@@ -308,9 +300,7 @@ class FSRomsHandler(FSHandler):
         from adapters.services.rahasher import RAHasherService
         from handler.metadata import meta_ra_handler
 
-        rel_roms_path = self.get_roms_fs_structure(
-            rom.platform.fs_slug
-        )  # Relative path to roms
+        rel_roms_path = rom.fs_path  # TODO(dynamic-libraries): resolve from library_id + platform in Step 4
         abs_fs_path = self.validate_path(rel_roms_path)  # Absolute path to roms
         rom_files: list[RomFile] = []
 
@@ -661,7 +651,7 @@ class FSRomsHandler(FSHandler):
         materializing FSRom objects.
         """
         try:
-            rel_roms_path = self.get_roms_fs_structure(platform.fs_slug)
+            rel_roms_path = f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
             fs_single_roms = await self.list_files(path=rel_roms_path)
             fs_multi_roms = await self.list_directories(path=rel_roms_path)
         except FileNotFoundError as e:
@@ -680,9 +670,7 @@ class FSRomsHandler(FSHandler):
             list with all the filesystem roms for a platform
         """
         try:
-            rel_roms_path = self.get_roms_fs_structure(
-                platform.fs_slug
-            )  # Relative path to roms
+            rel_roms_path = f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
 
             fs_single_roms = await self.list_files(path=rel_roms_path)
             fs_multi_roms = await self.list_directories(path=rel_roms_path)

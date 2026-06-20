@@ -1,6 +1,5 @@
 import enum
-import functools
-import glob
+import hashlib
 import json
 import os
 import sys
@@ -138,28 +137,6 @@ class Config:
 
     def __init__(self, **entries):
         self.__dict__.update(entries)
-
-    @functools.cached_property
-    def has_structure_path_a(self) -> bool:
-        # Structure A ({roms_folder}/{platform}) takes priority: if the top-level roms
-        # folder exists, claim Structure A even if some platform dirs happen to
-        # contain a {roms_folder} sub-folder.
-        roms_path = os.path.join(LIBRARY_BASE_PATH, self.ROMS_FOLDER_NAME)
-        return os.path.isdir(roms_path)
-
-    @functools.cached_property
-    def has_structure_path_b(self) -> bool:
-        if self.has_structure_path_a:
-            return False
-
-        pattern = os.path.join(
-            LIBRARY_BASE_PATH, "*", glob.escape(self.ROMS_FOLDER_NAME)
-        )
-        for match in glob.iglob(pattern):
-            if os.path.isdir(match):
-                return True
-
-        return False
 
 
 class ConfigManager:
@@ -451,7 +428,6 @@ class ConfigManager:
         )
 
     def _parse_libraries(self) -> list[dict[str, Any]]:
-        import hashlib
         raw_libraries = pydash.get(self._raw_config, "libraries", None)
         libraries = []
 

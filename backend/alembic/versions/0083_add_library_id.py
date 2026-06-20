@@ -20,8 +20,10 @@ branch_labels = None
 depends_on = None
 
 def get_default_library_id() -> str:
-    # Deterministic ID for the default library path
-    return hashlib.sha1(LIBRARY_BASE_PATH.encode("utf-8")).hexdigest()[:12]
+    # Resolve to absolute path first to match _parse_libraries() in config_manager.py,
+    # which calls os.path.abspath(path_val) before hashing.
+    abs_path = os.path.abspath(LIBRARY_BASE_PATH)
+    return hashlib.sha1(abs_path.encode("utf-8")).hexdigest()[:12]
 
 def upgrade() -> None:
     default_id = get_default_library_id()

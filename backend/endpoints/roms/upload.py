@@ -127,7 +127,7 @@ async def start_chunked_upload(
         )
 
     platform_fs_slug = db_platform.fs_slug
-    roms_path = fs_rom_handler.get_roms_fs_structure(platform_fs_slug)
+    roms_path = platform_fs_slug  # TODO(dynamic-libraries): resolve from library config in Step 4
 
     if await fs_rom_handler.file_exists(f"{roms_path}/{filename}"):
         raise HTTPException(
@@ -286,7 +286,7 @@ async def complete_chunked_upload(
 
     filename = session["filename"]
     platform_fs_slug = session["platform_fs_slug"]
-    roms_path = fs_rom_handler.get_roms_fs_structure(platform_fs_slug)
+    roms_path = platform_fs_slug  # TODO(dynamic-libraries): resolve from library config in Step 4
 
     try:
         file_location = fs_rom_handler.validate_path(f"{roms_path}/{filename}")

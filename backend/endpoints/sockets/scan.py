@@ -245,7 +245,7 @@ async def _identify_rom(
 
     # Update properties that don't require metadata
     parsed_tags = fs_rom_handler.parse_tags(fs_rom["fs_name"])
-    roms_path = fs_rom_handler.get_roms_fs_structure(platform.fs_slug)
+    roms_path = rom.fs_path if rom else f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
 
     # Create the entry early so we have the ID
     newly_added: bool = rom is None
