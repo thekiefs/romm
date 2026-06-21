@@ -766,6 +766,17 @@ class ConfigManager:
 
         return self.config
 
+    def get_library_path(self, library_id: str) -> str:
+        """Resolve the absolute filesystem path for a library by its ID.
+
+        Raises:
+            ValueError: if no library with the given ID is found in config.
+        """
+        for lib in self.get_config().LIBRARIES:
+            if lib["id"] == library_id:
+                return lib["path"]
+        raise ValueError(f"No library found with ID '{library_id}'")
+
     def _update_config_file(self) -> None:
         if not self._config_file_writable:
             log.warning("Config file not writable, skipping config file update")

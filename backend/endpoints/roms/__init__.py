@@ -33,8 +33,8 @@ from starlette.responses import FileResponse
 from config import (
     DEV_MODE,
     DISABLE_DOWNLOAD_ENDPOINT_AUTH,
-    LIBRARY_BASE_PATH,
 )
+from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses import BulkOperationResponse
 from endpoints.responses.rom import (
@@ -689,13 +689,14 @@ async def download_roms(
 
     content_lines = []
     for rom in rom_objects:
+        rom_lib_path = cm.get_library_path(rom.library_id)
         rom_files = sorted(rom.files, key=lambda x: x.file_name)
         for file in rom_files:
             content_lines.append(
                 ZipContentLine(
                     crc32=None,  # The CRC hash stored for compressed files is for the uncompressed content
                     size_bytes=file.file_size_bytes,
-                    encoded_location=quote(f"/library/{file.full_path}"),
+                    encoded_location=quote(f"/library{rom_lib_path}/{file.full_path}"),
                     filename=file.full_path,
                 )
             )
@@ -885,11 +886,14 @@ async def head_rom_content(
             detail=f"No files found for ROM {id}",
         )
 
+    # Resolve the library's absolute filesystem path for this ROM
+    lib_path = cm.get_library_path(rom.library_id)
+
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
         if len(files) == 1:
             file = files[0]
-            rom_path = f"{LIBRARY_BASE_PATH}/{file.full_path}"
+            rom_path = f"{lib_path}/{file.full_path}"
             return FileResponse(
                 path=rom_path,
                 filename=file.file_name,
@@ -910,7 +914,7 @@ async def head_rom_content(
     # Otherwise proxy through nginx
     if len(files) == 1:
         return FileRedirectResponse(
-            download_path=Path(f"/library/{files[0].full_path}"),
+            download_path=Path(f"/library{lib_path}/{files[0].full_path}"),
         )
 
     return Response(
@@ -977,11 +981,14 @@ async def get_rom_content(
     cue_files = [f for f in files if f.file_extension.lower() == "cue"]
     m3u_files = cue_files if cue_files else files
 
+    # Resolve the library's absolute filesystem path for this ROM
+    lib_path = cm.get_library_path(rom.library_id)
+
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
         if len(files) == 1:
             file = files[0]
-            rom_path = f"{LIBRARY_BASE_PATH}/{file.full_path}"
+            rom_path = f"{lib_path}/{file.full_path}"
             return FileResponse(
                 path=rom_path,
                 filename=file.file_name,
@@ -1000,7 +1007,7 @@ async def get_rom_content(
             with ZipFile(zip_buffer, "w") as zip_file:
                 # Add content files
                 for file in files:
-                    file_path = f"{LIBRARY_BASE_PATH}/{file.full_path}"
+                    file_path = f"{lib_path}/{file.full_path}"
                     try:
                         # Read entire file into memory
                         async with await open_file(file_path, "rb") as f:
@@ -1054,14 +1061,14 @@ async def get_rom_content(
     # Otherwise proxy through nginx
     if len(files) == 1:
         return FileRedirectResponse(
-            download_path=Path(f"/library/{files[0].full_path}"),
+            download_path=Path(f"/library{lib_path}/{files[0].full_path}"),
         )
 
     content_lines = [
         ZipContentLine(
             crc32=None,  # The CRC hash stored for compressed files is for the uncompressed content
             size_bytes=f.file_size_bytes,
-            encoded_location=quote(f"/library/{f.full_path}"),
+            encoded_location=quote(f"/library{lib_path}/{f.full_path}"),
             filename=f.file_name_for_download(hidden_folder),
         )
         for f in files
@@ -1533,22 +1540,25 @@ async def delete_roms(
             if id in delete_from_fs:
                 log.info(f"Deleting {hl(rom.fs_name)} from filesystem")
                 try:
+                    lib_path = cm.get_library_path(rom.library_id)
                     rom_path = f"{rom.fs_path}/{rom.fs_name}"
-                    full_path = fs_rom_handler.validate_path(rom_path)
+                    full_path = fs_rom_handler.validate_path(rom_path, base_path=lib_path)
                     if full_path.is_dir():
-                        await fs_rom_handler.remove_directory(rom_path)
+                        await fs_rom_handler.remove_directory(rom_path, base_path=lib_path)
                     else:
-                        await fs_rom_handler.remove_file(rom_path)
+                        await fs_rom_handler.remove_file(rom_path, base_path=lib_path)
                         # Clean up empty parent directory if it becomes empty
                         parent = full_path.parent
+                        lib_base = Path(lib_path).resolve()
                         if (
-                            parent != fs_rom_handler.base_path
+                            parent != lib_base
                             and parent.is_dir()
                             and not any(parent.iterdir())
                         ):
                             try:
                                 await fs_rom_handler.remove_directory(
-                                    str(parent.relative_to(fs_rom_handler.base_path))
+                                    str(parent.relative_to(lib_base)),
+                                    base_path=lib_path,
                                 )
                             except OSError as dir_err:
                                 log.warning(

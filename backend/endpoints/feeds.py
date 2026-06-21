@@ -15,6 +15,7 @@ from config import (
     DISABLE_DOWNLOAD_ENDPOINT_AUTH,
     TINFOIL_WELCOME_MESSAGE,
 )
+from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses.feeds import (
     WEBRCADE_SLUG_TO_TYPE_MAP,
@@ -250,7 +251,8 @@ def validate_pkgi_file(file: RomFile, content_type: RomFileCategory) -> bool:
         return False
 
     # Compressed files get a free pass
-    full_path = fs_rom_handler.validate_path(file.full_path)
+    lib_path = cm.get_library_path(file.library_id)
+    full_path = fs_rom_handler.validate_path(file.full_path, base_path=lib_path)
     if content_type == RomFileCategory.GAME and is_compressed_file(str(full_path)):
         return True
 

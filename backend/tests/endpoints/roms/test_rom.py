@@ -325,6 +325,10 @@ def test_delete_roms(client: TestClient, access_token: str, rom: Rom):
 
 
 @patch(
+    "endpoints.roms.cm.get_library_path",
+    return_value="/test/library",
+)
+@patch(
     "endpoints.roms.fs_rom_handler.remove_directory",
     new_callable=AsyncMock,
 )
@@ -339,6 +343,7 @@ def test_delete_roms_from_fs_flat(
     mock_validate_path,
     mock_remove_file,
     mock_remove_directory,
+    mock_get_library_path,
     client: TestClient,
     access_token: str,
     rom: Rom,
@@ -367,6 +372,10 @@ def test_delete_roms_from_fs_flat(
 
 
 @patch(
+    "endpoints.roms.cm.get_library_path",
+    return_value="/test/library",
+)
+@patch(
     "endpoints.roms.fs_rom_handler.remove_directory",
     new_callable=AsyncMock,
 )
@@ -381,6 +390,7 @@ def test_delete_roms_from_fs_flat_cleans_empty_parent(
     mock_validate_path,
     mock_remove_file,
     mock_remove_directory,
+    mock_get_library_path,
     client: TestClient,
     access_token: str,
     rom: Rom,
@@ -412,6 +422,10 @@ def test_delete_roms_from_fs_flat_cleans_empty_parent(
 
 
 @patch(
+    "endpoints.roms.cm.get_library_path",
+    return_value="/test/library",
+)
+@patch(
     "endpoints.roms.fs_rom_handler.remove_directory",
     new_callable=AsyncMock,
 )
@@ -421,6 +435,7 @@ def test_delete_roms_from_fs_flat_cleans_empty_parent(
 def test_delete_roms_from_fs_nested(
     mock_validate_path,
     mock_remove_directory,
+    mock_get_library_path,
     client: TestClient,
     access_token: str,
     platform: Platform,

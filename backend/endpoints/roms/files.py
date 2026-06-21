@@ -8,6 +8,7 @@ from fastapi import Request, status
 from starlette.responses import FileResponse
 
 from config import DEV_MODE, DISABLE_DOWNLOAD_ENDPOINT_AUTH
+from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses.rom import RomFileSchema
 from handler.auth.constants import Scope
@@ -72,7 +73,8 @@ async def get_romfile_content(
 
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
-        rom_path = fs_rom_handler.validate_path(file.full_path)
+        lib_path = cm.get_library_path(file.library_id)
+        rom_path = fs_rom_handler.validate_path(file.full_path, base_path=lib_path)
         return FileResponse(
             path=rom_path,
             filename=file_name,
@@ -84,6 +86,7 @@ async def get_romfile_content(
         )
 
     # Otherwise proxy through nginx
+    lib_path = cm.get_library_path(file.library_id)
     return FileRedirectResponse(
-        download_path=Path(f"/library/{file.full_path}"),
+        download_path=Path(f"/library{lib_path}/{file.full_path}"),
     )

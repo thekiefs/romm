@@ -4,6 +4,7 @@ from fastapi import Body, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from config import DISABLE_DOWNLOAD_ENDPOINT_AUTH
+from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses import BulkOperationResponse
 from endpoints.responses.firmware import AddFirmwareResponse, FirmwareSchema
@@ -190,7 +191,10 @@ def head_firmware_content(request: Request, id: int, file_name: str):
         log.error(error)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error)
 
-    firmware_path = fs_firmware_handler.validate_path(firmware.full_path)
+    lib_path = cm.get_library_path(firmware.library_id)
+    firmware_path = fs_firmware_handler.validate_path(
+        firmware.full_path, base_path=lib_path
+    )
 
     return FileResponse(
         path=firmware_path,
@@ -228,7 +232,10 @@ def get_firmware_content(
         log.error(error)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error)
 
-    firmware_path = fs_firmware_handler.validate_path(firmware.full_path)
+    lib_path = cm.get_library_path(firmware.library_id)
+    firmware_path = fs_firmware_handler.validate_path(
+        firmware.full_path, base_path=lib_path
+    )
 
     return FileResponse(path=firmware_path, filename=firmware.file_name)
 
@@ -273,7 +280,10 @@ async def delete_firmware(
                 log.info(f"Deleting {hl(fw.file_name)} from filesystem")
                 try:
                     file_path = f"{fw.file_path}/{fw.file_name}"
-                    await fs_firmware_handler.remove_file(file_path=file_path)
+                    lib_path = cm.get_library_path(fw.library_id)
+                    await fs_firmware_handler.remove_file(
+                        file_path=file_path, base_path=lib_path
+                    )
                 except FileNotFoundError:
                     error = f"Firmware file {hl(fw.file_name)} not found for platform {hl(fw.platform.slug)}"
                     log.error(error)

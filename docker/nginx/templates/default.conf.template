@@ -69,10 +69,13 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
-    # Internally redirect download requests
+    # Internally redirect download requests to files served from library paths.
+    # The backend resolves the absolute filesystem path per library_id and
+    # sends it via X-Accel-Redirect prefixed with /library, so nginx serves
+    # files from any configured library mount point.
     location /library/ {
         internal;
-        alias "${ROMM_BASE_PATH}/library/";
+        alias /;
     }
 
     # Internal decoding endpoint, used to decode base64 encoded data

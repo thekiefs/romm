@@ -176,8 +176,15 @@ class FSHandler:
 
         return filename
 
-    def validate_path(self, path: str) -> Path:
-        """Validate and normalize path to prevent directory traversal."""
+    def validate_path(self, path: str, base_path: str | None = None) -> Path:
+        """Validate and normalize path to prevent directory traversal.
+
+        Args:
+            path: Relative path within the base directory.
+            base_path: Optional override for the base directory. When provided,
+                validation is performed against this path instead of
+                ``self.base_path`` (used for multi-library path resolution).
+        """
         path_path = Path(path)
 
         # Check for explicit parent directory references
@@ -191,7 +198,7 @@ class FSHandler:
             raise ValueError(f"Path {path} must be relative, not absolute")
 
         # Normalize path without resolving the full path yet
-        base_path_obj = Path(self.base_path).resolve()
+        base_path_obj = Path(base_path).resolve() if base_path else self.base_path
         full_path = base_path_obj / path_path
 
         try:
@@ -203,7 +210,7 @@ class FSHandler:
                 full_path.resolve().relative_to(base_path_obj)
         except ValueError as exc:
             raise ValueError(
-                f"Path {path} is outside the base directory {self.base_path}"
+                f"Path {path} is outside the base directory {base_path_obj}"
             ) from exc
 
         return full_path
@@ -318,17 +325,18 @@ class FSHandler:
                 d for _, d in iter_directories(str(target_directory), recursive=False)
             ]
 
-    async def remove_directory(self, path: str) -> None:
+    async def remove_directory(self, path: str, base_path: str | None = None) -> None:
         """
         Remove a directory and all its contents.
 
         Args:
             path: Relative path within base directory
+            base_path: Optional override for the base directory.
 
         Raises:
             FileNotFoundError: If path is invalid or not a directory
         """
-        target_directory = self.validate_path(path)
+        target_directory = self.validate_path(path, base_path=base_path)
 
         # Async thread-safe directory removal
         lock = await self._get_file_lock(str(target_directory))
@@ -558,12 +566,13 @@ class FSHandler:
             dest_full_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source_full_path), str(dest_full_path))
 
-    async def remove_file(self, file_path: str) -> None:
+    async def remove_file(self, file_path: str, base_path: str | None = None) -> None:
         """
         Remove a file from the filesystem.
 
         Args:
             file_path: Relative path to the file to remove
+            base_path: Optional override for the base directory.
 
         Raises:
             FileNotFoundError: If file does not exist
@@ -572,7 +581,7 @@ class FSHandler:
             raise ValueError("File path cannot be empty")
 
         # Validate and normalize path
-        full_path = self.validate_path(file_path)
+        full_path = self.validate_path(file_path, base_path=base_path)
 
         # Async thread-safe file removal
         lock = await self._get_file_lock(str(full_path))
