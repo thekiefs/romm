@@ -252,6 +252,8 @@ def validate_pkgi_file(file: RomFile, content_type: RomFileCategory) -> bool:
 
     # Compressed files get a free pass
     lib_path = cm.get_library_path(file.library_id)
+    if lib_path is None:
+        return False
     full_path = fs_rom_handler.validate_path(file.full_path, base_path=lib_path)
     if content_type == RomFileCategory.GAME and is_compressed_file(str(full_path)):
         return True

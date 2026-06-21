@@ -183,6 +183,7 @@ COPY ./frontend/assets ${WEBSERVER_FOLDER}/assets
 RUN mkdir -p ${WEBSERVER_FOLDER}/assets/romm && \
     ln -sf /romm/resources ${WEBSERVER_FOLDER}/assets/romm/resources
 COPY ./backend /backend
+COPY ./scripts /scripts
 
 # Setup init script and config files
 COPY ./docker/init_scripts/* /

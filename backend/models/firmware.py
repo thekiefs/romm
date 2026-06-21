@@ -55,6 +55,16 @@ class Firmware(BaseModel):
     def full_path(self) -> str:
         return f"{self.file_path}/{self.file_name}"
 
+    def resolve_absolute_path(self) -> str | None:
+        """Return the absolute filesystem path for this firmware file, or
+        None if the library_id is no longer in config."""
+        from config.config_manager import config_manager as cm
+
+        lib_path = cm.get_library_path(self.library_id)
+        if lib_path is None:
+            return None
+        return f"{lib_path}/{self.full_path}"
+
     @classmethod
     def verify_file_hashes(
         cls,

@@ -689,14 +689,18 @@ async def download_roms(
 
     content_lines = []
     for rom in rom_objects:
-        rom_lib_path = cm.get_library_path(rom.library_id)
+        if rom.resolve_absolute_path() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Library for ROM {rom.id} is no longer configured. Run a scan to re-populate.",
+            )
         rom_files = sorted(rom.files, key=lambda x: x.file_name)
         for file in rom_files:
             content_lines.append(
                 ZipContentLine(
                     crc32=None,  # The CRC hash stored for compressed files is for the uncompressed content
                     size_bytes=file.file_size_bytes,
-                    encoded_location=quote(f"/library{rom_lib_path}/{file.full_path}"),
+                    encoded_location=quote(f"/library/{rom.library_id}/{file.full_path}"),
                     filename=file.full_path,
                 )
             )
@@ -886,16 +890,18 @@ async def head_rom_content(
             detail=f"No files found for ROM {id}",
         )
 
-    # Resolve the library's absolute filesystem path for this ROM
-    lib_path = cm.get_library_path(rom.library_id)
-
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
         if len(files) == 1:
             file = files[0]
-            rom_path = f"{lib_path}/{file.full_path}"
+            abs_path = file.resolve_absolute_path()
+            if abs_path is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+                )
             return FileResponse(
-                path=rom_path,
+                path=abs_path,
                 filename=file.file_name,
                 headers={
                     "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file.file_name)}; filename=\"{quote(file.file_name)}\"",
@@ -912,9 +918,14 @@ async def head_rom_content(
         )
 
     # Otherwise proxy through nginx
+    if rom.resolve_absolute_path() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+        )
     if len(files) == 1:
         return FileRedirectResponse(
-            download_path=Path(f"/library{lib_path}/{files[0].full_path}"),
+            download_path=Path(f"/library/{rom.library_id}/{files[0].full_path}"),
         )
 
     return Response(
@@ -981,16 +992,18 @@ async def get_rom_content(
     cue_files = [f for f in files if f.file_extension.lower() == "cue"]
     m3u_files = cue_files if cue_files else files
 
-    # Resolve the library's absolute filesystem path for this ROM
-    lib_path = cm.get_library_path(rom.library_id)
-
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
         if len(files) == 1:
             file = files[0]
-            rom_path = f"{lib_path}/{file.full_path}"
+            abs_path = file.resolve_absolute_path()
+            if abs_path is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+                )
             return FileResponse(
-                path=rom_path,
+                path=abs_path,
                 filename=file.file_name,
                 headers={
                     "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file.file_name)}; filename=\"{quote(file.file_name)}\"",
@@ -1007,10 +1020,15 @@ async def get_rom_content(
             with ZipFile(zip_buffer, "w") as zip_file:
                 # Add content files
                 for file in files:
-                    file_path = f"{lib_path}/{file.full_path}"
+                    abs_path = file.resolve_absolute_path()
+                    if abs_path is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+                        )
                     try:
                         # Read entire file into memory
-                        async with await open_file(file_path, "rb") as f:
+                        async with await open_file(abs_path, "rb") as f:
                             content = await f.read()
 
                         # Create ZIP info with compression
@@ -1027,7 +1045,7 @@ async def get_rom_content(
                         zip_file.writestr(zip_info, content)
 
                     except FileNotFoundError:
-                        log.error(f"File {hl(file_path)} not found!")
+                        log.error(f"File {hl(abs_path)} not found!")
                         raise
 
                 # Add M3U file if not already present
@@ -1059,16 +1077,21 @@ async def get_rom_content(
         )
 
     # Otherwise proxy through nginx
+    if rom.resolve_absolute_path() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+        )
     if len(files) == 1:
         return FileRedirectResponse(
-            download_path=Path(f"/library{lib_path}/{files[0].full_path}"),
+            download_path=Path(f"/library/{rom.library_id}/{files[0].full_path}"),
         )
 
     content_lines = [
         ZipContentLine(
             crc32=None,  # The CRC hash stored for compressed files is for the uncompressed content
             size_bytes=f.file_size_bytes,
-            encoded_location=quote(f"/library{lib_path}/{f.full_path}"),
+            encoded_location=quote(f"/library/{rom.library_id}/{f.full_path}"),
             filename=f.file_name_for_download(hidden_folder),
         )
         for f in files
@@ -1541,6 +1564,11 @@ async def delete_roms(
                 log.info(f"Deleting {hl(rom.fs_name)} from filesystem")
                 try:
                     lib_path = cm.get_library_path(rom.library_id)
+                    if lib_path is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Library for ROM {id} is no longer configured. Run a scan to re-populate.",
+                        )
                     rom_path = f"{rom.fs_path}/{rom.fs_name}"
                     full_path = fs_rom_handler.validate_path(rom_path, base_path=lib_path)
                     if full_path.is_dir():

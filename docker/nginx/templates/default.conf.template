@@ -70,13 +70,12 @@ server {
     }
 
     # Internally redirect download requests to files served from library paths.
-    # The backend resolves the absolute filesystem path per library_id and
-    # sends it via X-Accel-Redirect prefixed with /library, so nginx serves
-    # files from any configured library mount point.
-    location /library/ {
-        internal;
-        alias /;
-    }
+    # Per-library location blocks are generated at container startup from
+    # config.yml by scripts/generate_nginx_library_config.py and written to
+    # /etc/nginx/conf.d/libraries.conf. Each block scopes its alias to a
+    # single configured library root, preventing path traversal across
+    # libraries or to arbitrary filesystem paths.
+    include /etc/nginx/conf.d/libraries.conf;
 
     # Internal decoding endpoint, used to decode base64 encoded data
     location /decode {

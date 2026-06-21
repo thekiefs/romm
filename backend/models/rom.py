@@ -103,6 +103,16 @@ class RomFile(BaseModel):
     def full_path(self) -> str:
         return f"{self.file_path}/{self.file_name}"
 
+    def resolve_absolute_path(self) -> str | None:
+        """Return the absolute filesystem path for this ROM file, or None
+        if the library_id is no longer in config."""
+        from config.config_manager import config_manager as cm
+
+        lib_path = cm.get_library_path(self.library_id)
+        if lib_path is None:
+            return None
+        return f"{lib_path}/{self.full_path}"
+
     @cached_property
     def file_name_no_tags(self) -> str:
         from handler.filesystem import fs_rom_handler
@@ -321,6 +331,16 @@ class Rom(BaseModel):
     @cached_property
     def full_path(self) -> str:
         return f"{self.fs_path}/{self.fs_name}"
+
+    def resolve_absolute_path(self) -> str | None:
+        """Return the absolute filesystem path for this ROM, or None if
+        the library_id is no longer in config."""
+        from config.config_manager import config_manager as cm
+
+        lib_path = cm.get_library_path(self.library_id)
+        if lib_path is None:
+            return None
+        return f"{lib_path}/{self.full_path}"
 
     @cached_property
     def has_manual(self) -> bool:

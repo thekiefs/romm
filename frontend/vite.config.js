@@ -72,6 +72,7 @@ export default defineConfig(({ mode }) => {
   return {
     optimizeDeps: {
       include: VUETIFY_COMPONENTS,
+      exclude: ['vue-i18n'],
       esbuildOptions: {
         target: "esnext",
       },

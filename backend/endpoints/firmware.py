@@ -191,10 +191,12 @@ def head_firmware_content(request: Request, id: int, file_name: str):
         log.error(error)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error)
 
-    lib_path = cm.get_library_path(firmware.library_id)
-    firmware_path = fs_firmware_handler.validate_path(
-        firmware.full_path, base_path=lib_path
-    )
+    firmware_path = firmware.resolve_absolute_path()
+    if firmware_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Library for firmware {id} is no longer configured. Run a scan to re-populate.",
+        )
 
     return FileResponse(
         path=firmware_path,
@@ -232,10 +234,12 @@ def get_firmware_content(
         log.error(error)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error)
 
-    lib_path = cm.get_library_path(firmware.library_id)
-    firmware_path = fs_firmware_handler.validate_path(
-        firmware.full_path, base_path=lib_path
-    )
+    firmware_path = firmware.resolve_absolute_path()
+    if firmware_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Library for firmware {id} is no longer configured. Run a scan to re-populate.",
+        )
 
     return FileResponse(path=firmware_path, filename=firmware.file_name)
 
@@ -279,8 +283,13 @@ async def delete_firmware(
             if id in delete_from_fs:
                 log.info(f"Deleting {hl(fw.file_name)} from filesystem")
                 try:
-                    file_path = f"{fw.file_path}/{fw.file_name}"
                     lib_path = cm.get_library_path(fw.library_id)
+                    if lib_path is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Library for firmware {id} is no longer configured. Run a scan to re-populate.",
+                        )
+                    file_path = f"{fw.file_path}/{fw.file_name}"
                     await fs_firmware_handler.remove_file(
                         file_path=file_path, base_path=lib_path
                     )

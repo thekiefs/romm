@@ -134,6 +134,7 @@ class Config:
     GAMELIST_MEDIA_THUMBNAIL: MetadataMediaType
     GAMELIST_MEDIA_IMAGE: MetadataMediaType
     LIBRARIES: list[dict[str, Any]]
+    LIBRARY_PATHS: dict[str, str]
 
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -425,6 +426,7 @@ class ConfigManager:
                 self._raw_config, "scan.pegasus.export", False
             ),
             LIBRARIES=self._parse_libraries(),
+            LIBRARY_PATHS=self._parse_library_paths(),
         )
 
     def _parse_libraries(self) -> list[dict[str, Any]]:
@@ -452,6 +454,10 @@ class ConfigManager:
             })
 
         return libraries
+
+    def _parse_library_paths(self) -> dict[str, str]:
+        """Build a lookup dict mapping library_id → absolute path."""
+        return {lib["id"]: lib["path"] for lib in self.config.LIBRARIES}
 
     def _get_ejs_controls(self) -> dict[str, EjsControls]:
         """Get EJS controls with default player entries for each core"""
@@ -766,16 +772,15 @@ class ConfigManager:
 
         return self.config
 
-    def get_library_path(self, library_id: str) -> str:
+    def get_library_path(self, library_id: str) -> str | None:
         """Resolve the absolute filesystem path for a library by its ID.
 
-        Raises:
-            ValueError: if no library with the given ID is found in config.
+        Returns None if no library with the given ID is configured (e.g.
+        a stale library_id left over from a path change per spec §2.2).
+        Callers must handle the None case — at HTTP endpoints this should
+        become a 404 response.
         """
-        for lib in self.get_config().LIBRARIES:
-            if lib["id"] == library_id:
-                return lib["path"]
-        raise ValueError(f"No library found with ID '{library_id}'")
+        return self.get_config().LIBRARY_PATHS.get(library_id)
 
     def _update_config_file(self) -> None:
         if not self._config_file_writable:

@@ -8,7 +8,6 @@ from fastapi import Request, status
 from starlette.responses import FileResponse
 
 from config import DEV_MODE, DISABLE_DOWNLOAD_ENDPOINT_AUTH
-from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses.rom import RomFileSchema
 from handler.auth.constants import Scope
@@ -73,10 +72,14 @@ async def get_romfile_content(
 
     # Serve the file directly in development mode for emulatorjs
     if DEV_MODE:
-        lib_path = cm.get_library_path(file.library_id)
-        rom_path = fs_rom_handler.validate_path(file.full_path, base_path=lib_path)
+        abs_path = file.resolve_absolute_path()
+        if abs_path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Library for file {id} is no longer configured. Run a scan to re-populate.",
+            )
         return FileResponse(
-            path=rom_path,
+            path=abs_path,
             filename=file_name,
             headers={
                 "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file_name)}; filename=\"{quote(file_name)}\"",
@@ -86,7 +89,11 @@ async def get_romfile_content(
         )
 
     # Otherwise proxy through nginx
-    lib_path = cm.get_library_path(file.library_id)
+    if file.resolve_absolute_path() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Library for file {id} is no longer configured. Run a scan to re-populate.",
+        )
     return FileRedirectResponse(
-        download_path=Path(f"/library{lib_path}/{file.full_path}"),
+        download_path=Path(f"/library/{file.library_id}/{file.full_path}"),
     )
