@@ -23,7 +23,6 @@ from config import (
     SCHEDULED_UPDATE_SWITCH_TITLEDB_CRON,
     YOUTUBE_BASE_URL,
 )
-from config.config_manager import config_manager as cm
 from decorators.auth import protected_route
 from endpoints.responses.heartbeat import HeartbeatResponse
 from exceptions.fs_exceptions import PlatformAlreadyExistsException
@@ -183,22 +182,18 @@ async def metadata_heartbeat(source: str) -> bool:
     [],
 )
 async def get_setup_library_info(request: Request):
-    """Get library structure information for setup wizard.
+    """Get library information for setup wizard.
 
     Only accessible during initial setup (no admin users) or with authentication.
 
     Returns:
-        - detected_structure: "struct_a" (roms/{platform}), "struct_b" ({platform}/roms), or None
+        - detected_structure: always None (Structure A/B detection removed)
         - existing_platforms: list of objects with fs_slug and rom_count
         - supported_platforms: list of all supported platforms with metadata
     """
 
     # Check authentication - only allow public access if no admin users
     # If admin users exist, this would need authentication (but won't be called during setup)
-
-    # Auto-detect structure type
-    # Structure A: /library/roms/{platform}
-    # Structure B: /library/{platform}/roms
     # If there are admin users already, enforce the USERS_WRITE scope.
     if (
         Scope.PLATFORMS_READ not in request.auth.scopes
@@ -209,7 +204,7 @@ async def get_setup_library_info(request: Request):
             detail="Forbidden",
         )
 
-    detected_structure = fs_platform_handler.detect_library_structure()
+    detected_structure = None
 
     # Get existing platforms from filesystem
     try:
@@ -220,20 +215,11 @@ async def get_setup_library_info(request: Request):
 
     # Build existing platforms with rom counts
     existing_platforms = []
-    if detected_structure and existing_platform_slugs:
-        cnfg = cm.get_config()
+    if existing_platform_slugs:
         for fs_slug in existing_platform_slugs:
             rom_count = 0
             try:
-                # Determine the roms directory based on structure
-                if detected_structure == "struct_a":
-                    roms_path = os.path.join(
-                        LIBRARY_BASE_PATH, cnfg.ROMS_FOLDER_NAME, fs_slug
-                    )
-                else:  # Structure B
-                    roms_path = os.path.join(
-                        LIBRARY_BASE_PATH, fs_slug, cnfg.ROMS_FOLDER_NAME
-                    )
+                roms_path = os.path.join(LIBRARY_BASE_PATH, fs_slug)
 
                 # Count files and folders in the roms directory
                 roms_dir = AnyioPath(roms_path)
@@ -308,13 +294,6 @@ async def create_setup_platforms(request: Request, platform_slugs: list[str]):
         }
 
     try:
-        # Detect structure type to determine if we need to create the roms folder
-        detected_structure = fs_platform_handler.detect_library_structure()
-
-        # If no structure detected, create structure A
-        if detected_structure is None:
-            fs_platform_handler.create_library_structure()
-
         # Create platform folders
         created_count = 0
         failed_platforms = []

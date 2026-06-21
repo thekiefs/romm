@@ -89,6 +89,7 @@ NON_HASHABLE_PLATFORMS = frozenset(
 
 class FSRom(TypedDict):
     fs_name: str
+    fs_path: str
     flat: bool
     nested: bool
     files: list[RomFile]
@@ -258,8 +259,10 @@ class FSRomsHandler(FSHandler):
         file_size_bytes: int | None = None,
         last_modified: float | None = None,
         archive_members: list[dict[str, Any]] | None = None,
+        base_path: Path | None = None,
     ) -> RomFile:
-        abs_file_path = Path(self.base_path, rom_path, file_name)
+        base = base_path or self.base_path
+        abs_file_path = Path(base, rom_path, file_name)
 
         path_parts_lower = list(map(str.lower, rom_path.parts))
         matching_category = next(
@@ -295,13 +298,16 @@ class FSRomsHandler(FSHandler):
         )
 
     async def get_rom_files(
-        self, rom: Rom, calculate_hashes: bool = True
+        self, rom: Rom, calculate_hashes: bool = True, library_path: str | None = None
     ) -> ParsedRomFiles:
         from adapters.services.rahasher import RAHasherService
         from handler.metadata import meta_ra_handler
 
-        rel_roms_path = rom.fs_path  # TODO(dynamic-libraries): resolve from library_id + platform in Step 4
-        abs_fs_path = self.validate_path(rel_roms_path)  # Absolute path to roms
+        # Resolve the ROM's filesystem path. When library_path is provided
+        # (dynamic libraries), resolve against it; otherwise fall back to the
+        # handler's base_path (LIBRARY_BASE_PATH) for backward compatibility.
+        base = Path(library_path) if library_path else self.base_path
+        abs_fs_path = (base / rom.fs_path).resolve()
         rom_files: list[RomFile] = []
 
         # Skip hashing games for platforms that don't have a hash database or when hashes are disabled
@@ -418,9 +424,10 @@ class FSRomsHandler(FSHandler):
                 rom_files.append(
                     self._build_rom_file(
                         rom=rom,
-                        rom_path=f_path.relative_to(self.base_path),
+                        rom_path=f_path.relative_to(base),
                         file_name=file_name,
                         file_hash=file_hash,
+                        base_path=base,
                     )
                 )
         elif hashable_platform and rom_ext in ARCHIVE_READERS:
@@ -479,10 +486,11 @@ class FSRomsHandler(FSHandler):
                 rom_files.append(
                     self._build_rom_file(
                         rom=rom,
-                        rom_path=Path(rel_roms_path),
+                        rom_path=Path(rom.fs_path),
                         file_name=rom.fs_name,
                         file_hash=_make_file_hash(rom_crc_c, rom_md5_h, rom_sha1_h),
                         archive_members=members,
+                        base_path=base,
                     )
                 )
             else:
@@ -504,9 +512,10 @@ class FSRomsHandler(FSHandler):
                 rom_files.append(
                     self._build_rom_file(
                         rom=rom,
-                        rom_path=Path(rel_roms_path),
+                        rom_path=Path(rom.fs_path),
                         file_name=rom.fs_name,
                         file_hash=_make_file_hash(rom_crc_c, rom_md5_h, rom_sha1_h),
+                        base_path=base,
                     )
                 )
         elif hashable_platform:
@@ -545,9 +554,10 @@ class FSRomsHandler(FSHandler):
             rom_files.append(
                 self._build_rom_file(
                     rom=rom,
-                    rom_path=Path(rel_roms_path),
+                    rom_path=Path(rom.fs_path),
                     file_name=rom.fs_name,
                     file_hash=file_hash,
+                    base_path=base,
                 )
             )
         else:
@@ -560,9 +570,10 @@ class FSRomsHandler(FSHandler):
             rom_files.append(
                 self._build_rom_file(
                     rom=rom,
-                    rom_path=Path(rel_roms_path),
+                    rom_path=Path(rom.fs_path),
                     file_name=rom.fs_name,
                     file_hash=file_hash,
+                    base_path=base,
                 )
             )
 
@@ -651,9 +662,10 @@ class FSRomsHandler(FSHandler):
         materializing FSRom objects.
         """
         try:
-            rel_roms_path = f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
-            fs_single_roms = await self.list_files(path=rel_roms_path)
-            fs_multi_roms = await self.list_directories(path=rel_roms_path)
+            # TODO(dynamic-libraries): resolve from library config in Step 4
+            roms_path = f"{platform.fs_slug}"
+            fs_single_roms = await self.list_files(path=roms_path)
+            fs_multi_roms = await self.list_directories(path=roms_path)
         except FileNotFoundError as e:
             raise RomsNotFoundException(platform=platform.fs_slug) from e
 
@@ -670,10 +682,11 @@ class FSRomsHandler(FSHandler):
             list with all the filesystem roms for a platform
         """
         try:
-            rel_roms_path = f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
+            # TODO(dynamic-libraries): resolve from library config in Step 4
+            roms_path = f"{platform.fs_slug}"
 
-            fs_single_roms = await self.list_files(path=rel_roms_path)
-            fs_multi_roms = await self.list_directories(path=rel_roms_path)
+            fs_single_roms = await self.list_files(path=roms_path)
+            fs_multi_roms = await self.list_directories(path=roms_path)
         except FileNotFoundError as e:
             raise RomsNotFoundException(platform=platform.fs_slug) from e
 

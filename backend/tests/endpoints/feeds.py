@@ -5,6 +5,7 @@ from handler.database import db_platform_handler, db_rom_handler
 from handler.metadata.base_handler import UniversalPlatformSlug as UPS
 from models.platform import Platform
 from models.rom import Rom, RomFile, RomFileCategory
+from tests.conftest import TEST_LIBRARY_ID
 
 
 def test_webrcade_feed(
@@ -70,6 +71,7 @@ def test_tinfoil_feed(client: TestClient, platform: Platform, rom: Rom):
             file_path=rom.fs_path,
             file_size_bytes=456,
             sha1_hash="beadfeed",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -110,6 +112,7 @@ def test_pkgi_ps3_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -152,6 +155,7 @@ def test_pkgi_psvita_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -194,6 +198,7 @@ def test_pkgi_psp_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -301,6 +306,7 @@ def test_pkgj_psp_games_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -344,6 +350,7 @@ def test_pkgj_psp_dlc_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.DLC,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -387,6 +394,7 @@ def test_pkgj_psvita_games_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -430,6 +438,7 @@ def test_pkgj_psvita_dlc_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.DLC,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -472,6 +481,7 @@ def test_pkgj_psx_games_feed(
             file_size_bytes=456,
             sha1_hash="beadfeed",
             category=RomFileCategory.GAME,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 

@@ -9,6 +9,7 @@ from handler.filesystem import fs_platform_handler, fs_resource_handler
 from models.platform import Platform
 from models.rom import Rom
 from models.user import User
+from tests.conftest import TEST_LIBRARY_ID
 from utils.gamelist_exporter import GamelistExporter
 
 
@@ -31,6 +32,7 @@ def platform_with_roms(admin_user: User):
         languages=["en"],
         gamelist_id="12345",
         gamelist_metadata={"player_count": "2"},
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
     db_rom_handler.add_rom_user(rom_id=rom.id, user_id=admin_user.id)
@@ -74,6 +76,7 @@ def platform_with_minimal_rom(admin_user: User):
         fs_name_no_ext="unknown",
         fs_extension="gb",
         fs_path="gb/roms",
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
     db_rom_handler.add_rom_user(rom_id=rom.id, user_id=admin_user.id)
@@ -193,6 +196,7 @@ def test_export_gamelist_xml_skips_missing_roms(admin_user: User):
         fs_extension="nes",
         fs_path="nes/roms",
         missing_from_fs=True,
+        library_id=TEST_LIBRARY_ID,
     )
     db_rom_handler.add_rom(rom)
 

@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta, timezone
 
+import hashlib
+import os
+
 import alembic.config
 import pytest
 from joserfc import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from config import LIBRARY_BASE_PATH
 from config.config_manager import ConfigManager
 from handler.auth import auth_handler
 from handler.auth.base_handler import ALGORITHM, oct_key
@@ -26,6 +30,12 @@ from models.play_session import PlaySession
 from models.rom import Rom, RomFile
 from models.sync_session import SyncSession
 from models.user import Role, User
+
+# Default library_id for test fixtures — matches the ID computed from
+# LIBRARY_BASE_PATH by the config layer (SHA-1 of abspath, truncated to 12).
+TEST_LIBRARY_ID = hashlib.sha1(
+    os.path.abspath(LIBRARY_BASE_PATH).encode("utf-8")
+).hexdigest()[:12]
 
 engine = create_engine(ConfigManager.get_db_engine(), pool_pre_ping=True)
 session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -81,6 +91,7 @@ def rom(admin_user: User, platform: Platform):
         fs_name_no_ext="test_rom",
         fs_extension="zip",
         fs_path=f"{platform.slug}/roms",
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
 
@@ -97,6 +108,7 @@ def rom_file(rom: Rom):
         file_name="test_rom.zip",
         file_path=rom.fs_path,
         file_size_bytes=1000,
+        library_id=TEST_LIBRARY_ID,
     )
     return db_rom_handler.add_rom_file(rom_file)
 
@@ -118,6 +130,7 @@ def multi_file_rom(admin_user: User, platform: Platform):
         fs_name_no_ext="test_multi_file_rom",
         fs_extension="",
         fs_path=f"{platform.slug}/roms",
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
     db_rom_handler.add_rom_user(rom_id=rom.id, user_id=admin_user.id)
@@ -130,6 +143,7 @@ def multi_file_rom(admin_user: User, platform: Platform):
                 file_name=file_name,
                 file_path=folder_path,
                 file_size_bytes=1,
+                library_id=TEST_LIBRARY_ID,
             )
         )
 

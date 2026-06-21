@@ -16,6 +16,7 @@ from models.assets import Save, Screenshot, State
 from models.platform import Platform
 from models.rom import Rom
 from models.user import Role, User
+from tests.conftest import TEST_LIBRARY_ID
 
 
 def test_platforms():
@@ -47,6 +48,7 @@ def test_roms(rom: Rom, platform: Platform):
             fs_name_no_ext="test_rom_2",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -122,6 +124,7 @@ def test_filter_last_played(rom: Rom, platform: Platform, admin_user: User):
             fs_name_no_ext="test_rom_unplayed",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     db_rom_handler.add_rom_user(rom_id=second_rom.id, user_id=admin_user.id)
@@ -155,6 +158,7 @@ def test_filter_by_search_term_with_multiple_terms(platform: Platform):
             fs_name_no_ext="WWE_SmackDown_Here_Comes_the_Pain",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom_wcw = db_rom_handler.add_rom(
@@ -167,6 +171,7 @@ def test_filter_by_search_term_with_multiple_terms(platform: Platform):
             fs_name_no_ext="WCW_Nitro",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom_tna = db_rom_handler.add_rom(
@@ -179,6 +184,7 @@ def test_filter_by_search_term_with_multiple_terms(platform: Platform):
             fs_name_no_ext="TNA_Impact",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     _rom_non_matching = db_rom_handler.add_rom(
@@ -191,6 +197,7 @@ def test_filter_by_search_term_with_multiple_terms(platform: Platform):
             fs_name_no_ext="Super_Mario_World",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -236,6 +243,7 @@ def test_sibling_roms_empty_fs_name_no_tags_not_matched(platform: Platform):
             fs_name_no_ext="(Japan) Game A",
             fs_extension="iso",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom2 = db_rom_handler.add_rom(
@@ -248,6 +256,7 @@ def test_sibling_roms_empty_fs_name_no_tags_not_matched(platform: Platform):
             fs_name_no_ext="(Japan) Game B",
             fs_extension="iso",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -277,6 +286,7 @@ def test_sibling_roms_fs_name_no_tags_not_matched(platform: Platform):
             fs_name_no_ext="Sonic Jam (USA)",
             fs_extension="iso",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom2 = db_rom_handler.add_rom(
@@ -289,6 +299,7 @@ def test_sibling_roms_fs_name_no_tags_not_matched(platform: Platform):
             fs_name_no_ext="Sonic Jam (Japan)",
             fs_extension="iso",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -320,6 +331,7 @@ def test_group_by_meta_id_with_empty_fs_name_no_tags(platform: Platform):
                 fs_name_no_ext=name,
                 fs_extension="iso",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -346,6 +358,7 @@ def test_natural_sort_order(platform: Platform):
                 fs_name_no_ext=name,
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -368,6 +381,7 @@ def test_article_stripping_sort(platform: Platform):
                 fs_name_no_ext=name,
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -393,6 +407,7 @@ def test_bulk_mark_present(platform: Platform):
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
                 missing_from_fs=True,
+                library_id=TEST_LIBRARY_ID,
             )
         )
         roms.append(rom)
@@ -424,6 +439,7 @@ def test_bulk_mark_present_empty_list(platform: Platform):
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
             missing_from_fs=True,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -449,6 +465,7 @@ def test_bulk_mark_present_chunking(platform: Platform):
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
                 missing_from_fs=True,
+                library_id=TEST_LIBRARY_ID,
             )
         )
         roms.append(rom)
@@ -475,6 +492,7 @@ def test_mark_missing_roms_small_platform(platform: Platform):
             fs_name_no_ext="rom_a",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom_b = db_rom_handler.add_rom(
@@ -487,6 +505,7 @@ def test_mark_missing_roms_small_platform(platform: Platform):
             fs_name_no_ext="rom_b",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     db_rom_handler.add_rom(
@@ -499,6 +518,7 @@ def test_mark_missing_roms_small_platform(platform: Platform):
             fs_name_no_ext="rom_c",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -529,6 +549,7 @@ def test_mark_missing_roms_large_platform(platform: Platform):
             fs_name_no_ext="rom_present",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom_missing = db_rom_handler.add_rom(
@@ -541,6 +562,7 @@ def test_mark_missing_roms_large_platform(platform: Platform):
             fs_name_no_ext="rom_missing",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -576,6 +598,7 @@ def test_mark_missing_roms_large_platform_all_present(platform: Platform):
                 fs_name_no_ext=f"rom_{i}",
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
         roms.append(rom)
@@ -608,6 +631,7 @@ def test_mark_missing_roms_large_platform_all_missing(platform: Platform):
                 fs_name_no_ext=f"rom_{i}",
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
         roms.append(rom)
@@ -642,6 +666,7 @@ def test_mark_missing_roms_does_not_affect_other_platforms(platform: Platform):
             fs_name_no_ext="target_rom",
             fs_extension="zip",
             fs_path=f"{platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
     rom_on_other = db_rom_handler.add_rom(
@@ -654,6 +679,7 @@ def test_mark_missing_roms_does_not_affect_other_platforms(platform: Platform):
             fs_name_no_ext="other_rom",
             fs_extension="zip",
             fs_path=f"{other_platform.slug}/roms",
+            library_id=TEST_LIBRARY_ID,
         )
     )
 

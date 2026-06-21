@@ -257,14 +257,22 @@ async def scan_firmware(
     platform: Platform,
     file_name: str,
     firmware: Firmware | None = None,
+    firmware_path: str | None = None,
+    library_id: str | None = None,
 ) -> Firmware:
-    firmware_path = fs_firmware_handler.get_firmware_fs_structure(platform.fs_slug)
+    # Use the provided firmware_path (from library walk) or fall back to the
+    # old structure-based resolution for backward compatibility.
+    if firmware_path is None:
+        firmware_path = fs_firmware_handler.get_firmware_fs_structure(platform.fs_slug)
 
     # Set default properties
-    firmware_attrs = {
+    firmware_attrs: dict[str, Any] = {
         "id": firmware.id if firmware else None,
         "platform_id": platform.id,
     }
+
+    if library_id:
+        firmware_attrs["library_id"] = library_id
 
     file_path = f"{firmware_path}/{file_name}"
     file_size = await fs_firmware_handler.get_file_size(file_path)
@@ -303,8 +311,9 @@ async def scan_rom(
     newly_added: bool,
     launchbox_remote_enabled: bool = True,
     socket_manager: socketio.AsyncRedisManager | None = None,
+    library_id: str | None = None,
 ) -> Rom:
-    rom_attrs = {
+    rom_attrs: dict[str, Any] = {
         "id": rom.id,
         "platform_id": platform.id,
         "fs_name": fs_rom["fs_name"],
@@ -322,6 +331,9 @@ async def scan_rom(
         "ra_hash": rom.ra_hash,
         "fs_size_bytes": rom.fs_size_bytes,
     }
+
+    if library_id:
+        rom_attrs["library_id"] = library_id
 
     # Check if files have been parsed and hashed
     if len(fs_rom["files"]) > 0:

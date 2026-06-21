@@ -1,5 +1,6 @@
 import os
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Generator
 
@@ -268,3 +269,133 @@ class LibraryHandler:
                 yield from LibraryHandler._walk_segments(
                     Path(entry.path), remaining, match_vars
                 )
+
+
+@dataclass
+class ScannedRom:
+    """A ROM discovered during a library walk."""
+    fs_name: str
+    fs_path: str  # Relative to library root
+    is_dir: bool  # True for multi-file ROMs (gameDir), False for single-file (gameFile)
+
+
+@dataclass
+class ScannedFirmware:
+    """A firmware file discovered during a library walk."""
+    file_name: str
+    file_path: str  # Relative to library root (directory containing the file)
+
+
+@dataclass
+class PlatformScanEntries:
+    """All ROMs and firmware found for a platform within a single library."""
+    roms: list[ScannedRom] = field(default_factory=list)
+    firmware: list[ScannedFirmware] = field(default_factory=list)
+
+
+def scan_library(
+    library: dict[str, Any],
+) -> dict[str, PlatformScanEntries]:
+    """Walk a library's filesystem and group entries by platform slug.
+
+    Args:
+        library: A library dict from config with keys: id, name, path, structure, platforms.
+
+    Returns:
+        A dict mapping platform fs_slug to PlatformScanEntries containing
+        the ROMs and firmware found under that platform.
+
+    For template mode, the platform slug is extracted from the {platformDir}
+    variable. For flat mode (empty structure), every file/directory at the
+    library root is treated as belonging to the platform specified in the
+    library's per-platform config (lib["platforms"]). If flat mode has no
+    platform config, entries are grouped by directory name as the platform slug.
+    """
+    lib_path = Path(library["path"])
+    structure = library.get("structure", "")
+    lib_platforms: dict = library.get("platforms", {})
+
+    result: dict[str, PlatformScanEntries] = {}
+
+    def _ensure_platform(slug: str) -> PlatformScanEntries:
+        if slug not in result:
+            result[slug] = PlatformScanEntries()
+        return result[slug]
+
+    for entry in LibraryHandler.match_template(lib_path, structure):
+        entry_type = entry["type"]
+        entry_path: Path = entry["path"]
+        vars_dict: dict[str, str] = entry["vars"]
+
+        if structure:
+            # Template mode — platform comes from {platformDir}
+            platform_slug = vars_dict.get("{platformDir}", "")
+            if not platform_slug:
+                continue
+
+            rel_path = entry_path.relative_to(lib_path)
+            platform_entries = _ensure_platform(platform_slug)
+
+            if entry_type == "gameFile":
+                platform_entries.roms.append(
+                    ScannedRom(
+                        fs_name=entry_path.name,
+                        fs_path=str(rel_path.parent),
+                        is_dir=False,
+                    )
+                )
+            elif entry_type == "gameDir":
+                platform_entries.roms.append(
+                    ScannedRom(
+                        fs_name=entry_path.name,
+                        fs_path=str(rel_path.parent),
+                        is_dir=True,
+                    )
+                )
+            elif entry_type == "biosFile":
+                platform_entries.firmware.append(
+                    ScannedFirmware(
+                        file_name=entry_path.name,
+                        file_path=str(rel_path.parent),
+                    )
+                )
+        else:
+            # Flat mode — platform resolution depends on lib["platforms"] config.
+            # If the library has a per-platform config, all flat entries belong
+            # to that single platform. Otherwise, group by top-level directory.
+            if lib_platforms:
+                # Use the first (expected: only) platform key from the config
+                platform_slug = next(iter(lib_platforms))
+            else:
+                # No platform config: use the entry's parent directory name as slug
+                # (or the entry name itself if it's at the library root)
+                try:
+                    rel_path = entry_path.relative_to(lib_path)
+                    platform_slug = rel_path.parts[0] if rel_path.parts else ""
+                except ValueError:
+                    continue
+
+            if not platform_slug:
+                continue
+
+            rel_path = entry_path.relative_to(lib_path)
+            platform_entries = _ensure_platform(platform_slug)
+
+            if entry_type == "file":
+                platform_entries.roms.append(
+                    ScannedRom(
+                        fs_name=entry_path.name,
+                        fs_path=str(rel_path.parent),
+                        is_dir=False,
+                    )
+                )
+            elif entry_type == "dir":
+                platform_entries.roms.append(
+                    ScannedRom(
+                        fs_name=entry_path.name,
+                        fs_path=str(rel_path.parent),
+                        is_dir=True,
+                    )
+                )
+
+    return result

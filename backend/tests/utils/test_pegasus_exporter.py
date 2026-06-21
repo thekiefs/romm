@@ -8,6 +8,7 @@ from handler.filesystem import fs_resource_handler
 from models.platform import Platform
 from models.rom import Rom
 from models.user import User
+from tests.conftest import TEST_LIBRARY_ID
 from utils.pegasus_exporter import PegasusExporter
 
 
@@ -117,6 +118,7 @@ class TestExportMetadata:
             regions=["USA"],
             languages=["en"],
             tags=["Retro"],
+            library_id=TEST_LIBRARY_ID,
         )
         rom = db_rom_handler.add_rom(rom)
         db_rom_handler.add_rom_user(rom_id=rom.id, user_id=admin_user.id)
@@ -170,6 +172,7 @@ class TestExportMetadata:
                 fs_name_no_ext="unknown",
                 fs_extension="gb",
                 fs_path="gb/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -199,6 +202,7 @@ class TestExportMetadata:
                 fs_extension="nes",
                 fs_path="nes/roms",
                 missing_from_fs=True,
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -230,6 +234,7 @@ class TestExportMetadata:
                 fs_extension="gba",
                 fs_path="gba/roms",
                 summary="First line.\n\nThird line.",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 

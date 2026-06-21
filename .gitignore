@@ -68,3 +68,7 @@ switch_product_ids.json
 
 # AI tools
 .claude
+PLAN.md
+AGENTS.md
+dynamic-library-implementation_plan.md
+dynamic-library-implementation_tasks.md

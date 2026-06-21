@@ -13,6 +13,7 @@ from models.device import Device
 from models.platform import Platform
 from models.rom import Rom
 from models.user import User
+from tests.conftest import TEST_LIBRARY_ID
 from utils.datetime import to_utc
 
 
@@ -485,6 +486,7 @@ class TestPlaySessionRomUserUpdates:
                 fs_name_no_ext="new_rom",
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 
@@ -518,6 +520,7 @@ class TestPlaySessionQuery:
                 fs_name_no_ext="other_rom",
                 fs_extension="zip",
                 fs_path=f"{platform.slug}/roms",
+                library_id=TEST_LIBRARY_ID,
             )
         )
 

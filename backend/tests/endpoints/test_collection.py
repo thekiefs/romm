@@ -12,6 +12,7 @@ from models.collection import Collection
 from models.platform import Platform
 from models.rom import Rom
 from models.user import User
+from tests.conftest import TEST_LIBRARY_ID
 
 # Minimal valid PNG (1x1 transparent pixel)
 _PNG_BYTES = (
@@ -64,6 +65,7 @@ def second_rom(admin_user: User, platform: Platform) -> Rom:
         fs_name_no_ext="test_rom_2",
         fs_extension="zip",
         fs_path=f"{platform.slug}/roms",
+        library_id=TEST_LIBRARY_ID,
     )
     return db_rom_handler.add_rom(rom)
 

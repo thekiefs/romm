@@ -19,7 +19,6 @@ from endpoints.responses.rom import SimpleRomSchema
 from exceptions.fs_exceptions import (
     FOLDER_STRUCT_MSG,
     FirmwareNotFoundException,
-    FolderStructureNotMatchException,
     RomsNotFoundException,
 )
 from exceptions.socket_exceptions import ScanStoppedException
@@ -31,6 +30,12 @@ from handler.filesystem import (
     fs_rom_handler,
 )
 from handler.filesystem.roms_handler import FSRom
+from handler.filesystem.library_handler import (
+    PlatformScanEntries,
+    ScannedFirmware,
+    ScannedRom,
+    scan_library,
+)
 from handler.metadata import meta_gamelist_handler, meta_hltb_handler
 from handler.metadata.ss_handler import add_ss_auth_to_url, get_preferred_media_types
 from handler.redis_handler import get_job_func_name, high_prio_queue, redis_client
@@ -116,6 +121,8 @@ def _get_socket_manager() -> socketio.AsyncRedisManager:
 async def _identify_firmware(
     platform: Platform,
     fs_fw: str,
+    firmware_path: str | None = None,
+    library_id: str | None = None,
 ) -> int:
     # Break early if the flag is set
     if redis_client.get(STOP_SCAN_FLAG):
@@ -127,6 +134,8 @@ async def _identify_firmware(
         platform=platform,
         file_name=fs_fw,
         firmware=firmware,
+        firmware_path=firmware_path,
+        library_id=library_id,
     )
 
     is_verified = Firmware.verify_file_hashes(
@@ -238,6 +247,8 @@ async def _identify_rom(
     launchbox_remote_enabled: bool,
     socket_manager: socketio.AsyncRedisManager,
     scan_stats: ScanStats,
+    library_id: str | None = None,
+    library_path: str | None = None,
 ) -> None:
     # Break early if the flag is set
     if redis_client.get(STOP_SCAN_FLAG):
@@ -245,7 +256,7 @@ async def _identify_rom(
 
     # Update properties that don't require metadata
     parsed_tags = fs_rom_handler.parse_tags(fs_rom["fs_name"])
-    roms_path = rom.fs_path if rom else f"{platform.fs_slug}"  # TODO(dynamic-libraries): resolve from library config in Step 4
+    roms_path = rom.fs_path if rom else fs_rom.get("fs_path", platform.fs_slug)
 
     # Create the entry early so we have the ID
     newly_added: bool = rom is None
@@ -271,6 +282,7 @@ async def _identify_rom(
                 url_cover="",
                 url_manual="",
                 url_screenshots=[],
+                library_id=library_id,
             )
         )
 
@@ -288,7 +300,7 @@ async def _identify_rom(
             log.debug(f"Calculating file hashes for {rom.fs_name}...")
 
         parsed_rom_files = await fs_rom_handler.get_rom_files(
-            rom, calculate_hashes=calculate_hashes
+            rom, calculate_hashes=calculate_hashes, library_path=library_path
         )
         fs_rom.update(
             {
@@ -340,6 +352,7 @@ async def _identify_rom(
         newly_added=newly_added,
         launchbox_remote_enabled=launchbox_remote_enabled,
         socket_manager=socket_manager,
+        library_id=library_id,
     )
 
     await scan_stats.increment(
@@ -384,6 +397,7 @@ async def _identify_rom(
                 sha1_hash=file.sha1_hash,
                 ra_hash=file.ra_hash,
                 chd_sha1_hash=file.chd_sha1_hash,
+                library_id=library_id,
             )
             for file in fs_rom["files"]
         ]
@@ -502,6 +516,9 @@ async def _identify_platform(
     launchbox_remote_enabled: bool,
     socket_manager: socketio.AsyncRedisManager,
     scan_stats: ScanStats,
+    scan_entries: PlatformScanEntries | None = None,
+    library_id: str | None = None,
+    library_path: str | None = None,
 ) -> ScanStats:
     # Stop the scan if the flag is set
     if redis_client.get(STOP_SCAN_FLAG):
@@ -528,24 +545,33 @@ async def _identify_platform(
     if MetadataSource.GAMELIST in metadata_sources:
         await meta_gamelist_handler.populate_cache(platform)
 
-    # Scanning firmware
-    try:
-        fs_firmware = await fs_firmware_handler.get_firmware(platform.fs_slug)
-    except FirmwareNotFoundException:
-        fs_firmware = []
+    # Gather firmware entries — from the library walk or the old filesystem handler
+    if scan_entries and scan_entries.firmware:
+        fs_firmware_files = [
+            (fw.file_name, fw.file_path) for fw in scan_entries.firmware
+        ]
+    else:
+        try:
+            fw_names = await fs_firmware_handler.get_firmware(platform.fs_slug)
+            fw_path = fs_firmware_handler.get_firmware_fs_structure(platform.fs_slug)
+            fs_firmware_files = [(name, fw_path) for name in fw_names]
+        except FirmwareNotFoundException:
+            fs_firmware_files = []
 
-    if len(fs_firmware) == 0:
+    if len(fs_firmware_files) == 0:
         log.warning(
             f"{hl(emoji.EMOJI_WARNING, color=LIGHTYELLOW)} No firmware found for {hl(platform.custom_name or platform.name, color=BLUE)}[{hl(platform.fs_slug)}]"
         )
     else:
-        log.info(f"{hl(str(len(fs_firmware)))} firmware files found")
+        log.info(f"{hl(str(len(fs_firmware_files)))} firmware files found")
 
     new_firmware = 0
-    for fs_fw in fs_firmware:
+    for fw_name, fw_path in fs_firmware_files:
         new_firmware += await _identify_firmware(
             platform=platform,
-            fs_fw=fs_fw,
+            fs_fw=fw_name,
+            firmware_path=fw_path,
+            library_id=library_id,
         )
 
     await socket_manager.emit(
@@ -566,15 +592,32 @@ async def _identify_platform(
     # This reduces the number of socket emissions
     await scan_stats.increment(
         socket_manager=socket_manager,
-        scanned_firmware=len(fs_firmware),
+        scanned_firmware=len(fs_firmware_files),
         new_firmware=new_firmware,
     )
 
-    try:
-        fs_roms = await fs_rom_handler.get_roms(platform)
-    except RomsNotFoundException as e:
-        log.error(e)
-        return scan_stats
+    # Gather ROM entries — from the library walk or the old filesystem handler
+    if scan_entries and scan_entries.roms:
+        fs_roms: list[FSRom] = [
+            FSRom(
+                fs_name=scanned_rom.fs_name,
+                fs_path=scanned_rom.fs_path,
+                flat=not scanned_rom.is_dir,
+                nested=scanned_rom.is_dir,
+                files=[],
+                crc_hash="",
+                md5_hash="",
+                sha1_hash="",
+                ra_hash="",
+            )
+            for scanned_rom in scan_entries.roms
+        ]
+    else:
+        try:
+            fs_roms = await fs_rom_handler.get_roms(platform)
+        except RomsNotFoundException as e:
+            log.error(e)
+            return scan_stats
 
     if len(fs_roms) == 0:
         log.warning(
@@ -599,6 +642,8 @@ async def _identify_platform(
                 launchbox_remote_enabled=launchbox_remote_enabled,
                 socket_manager=socket_manager,
                 scan_stats=scan_stats,
+                library_id=library_id,
+                library_path=library_path,
             )
 
     for fs_roms_batch in batched(fs_roms, 200, strict=False):
@@ -652,7 +697,7 @@ async def _identify_platform(
             log.warning(f" - {r.fs_name}")
 
     missing_firmware = db_firmware_handler.mark_missing_firmware(
-        platform.id, [fw for fw in fs_firmware]
+        platform.id, [fw_name for fw_name, _ in fs_firmware_files]
     )
     if len(missing_firmware) > 0:
         log.warning(f"{hl('Missing')} firmware from filesystem:")
@@ -684,13 +729,6 @@ async def scan_platforms(
     socket_manager = _get_socket_manager()
     scan_stats = ScanStats()
 
-    try:
-        fs_platforms: list[str] = await fs_platform_handler.get_platforms()
-    except FolderStructureNotMatchException as e:
-        log.error(e)
-        await socket_manager.emit("scan:done_ko", e.message)
-        return scan_stats
-
     # Clear the gamelist cache to ensure we're using fresh gamelist.xml data
     meta_gamelist_handler.clear_cache()
 
@@ -698,14 +736,43 @@ async def scan_platforms(
     if MetadataSource.HLTB in metadata_sources:
         meta_hltb_handler.initialize()
 
-    total_roms = 0
-    for platform_slug in fs_platforms:
+    config = cm.get_config()
+    libraries = config.LIBRARIES
+
+    # Walk each library and collect platform entries
+    # all_scans maps (library_id, platform_slug) → PlatformScanEntries
+    all_scans: dict[tuple[str, str], PlatformScanEntries] = {}
+    all_fs_platforms: set[str] = set()
+
+    for lib in libraries:
+        lib_id = lib["id"]
+        lib_path = lib["path"]
         try:
-            total_roms += await fs_rom_handler.count_roms(
-                Platform(fs_slug=platform_slug)
+            lib_result = scan_library(lib)
+        except Exception as e:
+            log.error(
+                f"Error walking library '{lib['name']}' ({lib_path}): {e}",
+                exc_info=True,
             )
-        except RomsNotFoundException as e:
-            log.error(e)
+            continue
+
+        for platform_slug, entries in lib_result.items():
+            all_fs_platforms.add(platform_slug)
+            key = (lib_id, platform_slug)
+            if key in all_scans:
+                # Merge entries if the same platform appears multiple times
+                # within the same library (shouldn't normally happen)
+                all_scans[key].roms.extend(entries.roms)
+                all_scans[key].firmware.extend(entries.firmware)
+            else:
+                all_scans[key] = entries
+
+    fs_platforms = sorted(all_fs_platforms)
+
+    # Pre-count total ROMs
+    total_roms = sum(
+        len(entries.roms) for entries in all_scans.values()
+    )
 
     await scan_stats.update(
         socket_manager=socket_manager,
@@ -719,24 +786,35 @@ async def scan_platforms(
         redis_client.delete(STOP_SCAN_FLAG)
 
     try:
-        platform_list = [
-            platform.fs_slug
-            for s in platform_ids
-            if (platform := db_platform_handler.get_platform(s)) is not None
-        ] or fs_platforms
-        platform_list = sorted(platform_list)
+        # Determine which platforms to scan.
+        # If platform_ids is provided, scope to those platforms' fs_slugs.
+        if platform_ids:
+            selected_slugs = {
+                platform.fs_slug
+                for s in platform_ids
+                if (platform := db_platform_handler.get_platform(s)) is not None
+            }
+        else:
+            selected_slugs = set(fs_platforms)
 
-        if len(platform_list) == 0:
+        if len(selected_slugs) == 0:
             log.warning(
                 f"{hl(emoji.EMOJI_WARNING, color=LIGHTYELLOW)} No platforms found, verify that the folder structure is right and the volume is mounted correctly."
                 f"{FOLDER_STRUCT_MSG}"
             )
         else:
             log.info(
-                f"Found {hl(str(len(platform_list)))} platforms in the file system"
+                f"Found {hl(str(len(selected_slugs)))} platforms in the file system"
             )
 
-        for platform_slug in platform_list:
+        # Iterate over each (library, platform) pair and scan
+        for (lib_id, platform_slug), entries in sorted(all_scans.items()):
+            if platform_slug not in selected_slugs:
+                continue
+
+            # Find the library's path for this library_id
+            lib_info = next(l for l in libraries if l["id"] == lib_id)
+
             scan_stats = await _identify_platform(
                 platform_slug=platform_slug,
                 scan_type=scan_type,
@@ -746,6 +824,9 @@ async def scan_platforms(
                 launchbox_remote_enabled=launchbox_remote_enabled,
                 socket_manager=socket_manager,
                 scan_stats=scan_stats,
+                scan_entries=entries,
+                library_id=lib_id,
+                library_path=lib_info["path"],
             )
 
         missed_platforms = db_platform_handler.mark_missing_platforms(fs_platforms)
@@ -757,13 +838,12 @@ async def scan_platforms(
         log.info(f"{emoji.EMOJI_CHECK_MARK} Scan completed")
 
         # Export metadata files if enabled in config
-        config = cm.get_config()
         platforms_by_slug = {p.fs_slug: p for p in db_platform_handler.get_platforms()}
 
         if config.GAMELIST_AUTO_EXPORT_ON_SCAN:
             log.info("Auto-exporting gamelist.xml for all platforms...")
             gamelist_exporter = GamelistExporter(local_export=True)
-            for platform_slug in platform_list:
+            for platform_slug in fs_platforms:
                 platform = platforms_by_slug.get(platform_slug)
                 if platform:
                     export_success = await gamelist_exporter.export_platform_to_file(
@@ -783,7 +863,7 @@ async def scan_platforms(
         if config.PEGASUS_AUTO_EXPORT_ON_SCAN:
             log.info("Auto-exporting metadata.pegasus.txt for all platforms...")
             pegasus_exporter = PegasusExporter(local_export=True)
-            for platform_slug in platform_list:
+            for platform_slug in fs_platforms:
                 platform = platforms_by_slug.get(platform_slug)
                 if platform:
                     export_success = await pegasus_exporter.export_platform_to_file(

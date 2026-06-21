@@ -20,9 +20,6 @@ def upload_fs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(upload_endpoint, "ROM_UPLOAD_TMP_BASE", uploads_tmp)
     monkeypatch.setattr(
-        upload_endpoint.fs_rom_handler, "get_roms_fs_structure", lambda _slug: "roms"
-    )
-    monkeypatch.setattr(
         upload_endpoint.fs_rom_handler,
         "validate_path",
         lambda path: final_dir / Path(path).name,

@@ -13,6 +13,7 @@ from handler.metadata.ra_handler import RAGameRom
 from handler.scan_handler import MetadataSource, ScanType, scan_platform, scan_rom
 from models.platform import Platform
 from models.rom import Rom, RomFile
+from tests.conftest import TEST_LIBRARY_ID
 from utils.context import initialize_context
 
 
@@ -61,6 +62,7 @@ async def test_scan_rom():
         hasheous_id=4872,
         fs_size_bytes=1024,
         tags=[],
+        library_id=TEST_LIBRARY_ID,
     )
 
     async with initialize_context():
@@ -91,6 +93,7 @@ async def test_scan_rom():
             },
             metadata_sources=[MetadataSource.HASHEOUS],
             newly_added=True,
+            library_id=TEST_LIBRARY_ID,
         )
 
     assert type(rom) is Rom
@@ -150,6 +153,7 @@ async def test_scan_rom_complete_clears_unselected_metadata(
         hasheous_id=4872,
         fs_size_bytes=1024,
         tags=[],
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
 
@@ -170,6 +174,7 @@ async def test_scan_rom_complete_clears_unselected_metadata(
             },
             metadata_sources=[MetadataSource.HASHEOUS],
             newly_added=False,
+            library_id=TEST_LIBRARY_ID,
         )
 
     # IGDB and RA were unselected — their id and metadata must be cleared.
@@ -220,6 +225,7 @@ async def test_scan_rom_unmatched_fetches_ra_when_id_set_but_no_metadata(
         ra_metadata={},  # empty - never fetched
         fs_size_bytes=1024,
         tags=[],
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
 
@@ -240,6 +246,7 @@ async def test_scan_rom_unmatched_fetches_ra_when_id_set_but_no_metadata(
             },
             metadata_sources=[MetadataSource.RA],
             newly_added=False,
+            library_id=TEST_LIBRARY_ID,
         )
 
     # ra_id was set manually - get_rom_by_id should be called, not get_rom
@@ -282,6 +289,7 @@ async def test_scan_rom_unmatched_skips_ra_when_id_and_metadata_exist(
         ra_metadata={"achievements_count": 60},  # already populated
         fs_size_bytes=1024,
         tags=[],
+        library_id=TEST_LIBRARY_ID,
     )
     rom = db_rom_handler.add_rom(rom)
 
@@ -302,6 +310,7 @@ async def test_scan_rom_unmatched_skips_ra_when_id_and_metadata_exist(
             },
             metadata_sources=[MetadataSource.RA],
             newly_added=False,
+            library_id=TEST_LIBRARY_ID,
         )
 
     # Both ID and metadata exist - should not re-fetch

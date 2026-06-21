@@ -16,6 +16,7 @@ from handler.metadata.ra_handler import RAGameRom, RAHandler
 from handler.metadata.ss_handler import SSHandler, SSRom
 from models.platform import Platform
 from models.rom import Rom, RomFile
+from tests.conftest import TEST_LIBRARY_ID
 
 MOCK_IGDB_ID = 11111
 MOCK_MOBY_ID = 22222
@@ -95,6 +96,7 @@ def test_get_all_roms_with_files(
             file_path=f"{platform.slug}/roms",
             file_size_bytes=1024,
             last_modified=1700000000.0,
+            library_id=TEST_LIBRARY_ID,
         )
     )
 
@@ -439,6 +441,7 @@ def test_delete_roms_from_fs_nested(
         fs_name_no_ext="Nested Game",
         fs_extension="",
         fs_path=f"{platform.slug}/roms",
+        library_id=TEST_LIBRARY_ID,
     )
     nested_rom = db_rom_handler.add_rom(nested_rom)
 
