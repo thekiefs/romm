@@ -70,12 +70,18 @@ server {
     }
 
     # Internally redirect download requests to files served from library paths.
-    # Per-library location blocks are generated at container startup from
-    # config.yml by scripts/generate_nginx_library_config.py and written to
-    # /etc/nginx/conf.d/libraries.conf. Each block scopes its alias to a
-    # single configured library root, preventing path traversal across
-    # libraries or to arbitrary filesystem paths.
-    include /etc/nginx/conf.d/libraries.conf;
+    # The backend resolves the absolute filesystem path per library_id and
+    # sends it via X-Accel-Redirect prefixed with /library.
+    #
+    # NOTE: alias / means nginx does not enforce that the resolved path is
+    # under a configured library root. The backend validates library_id
+    # (rejecting stale IDs) and rejects ".." traversal in resolve_absolute_path,
+    # but a comprehensive fix should scope this at the nginx layer (e.g.
+    # per-library location blocks or a symlink-based approach). See PLAN.md §6.
+    location /library/ {
+        internal;
+        alias /;
+    }
 
     # Internal decoding endpoint, used to decode base64 encoded data
     location /decode {

@@ -349,14 +349,6 @@ fi
 # Startup process requires database and cache to be already available
 run_startup
 
-# Generate per-library nginx location blocks from config.yml
-info_log "Generating nginx library config"
-if PYTHONPATH="/backend:${PYTHONPATH-}" python3 /scripts/generate_nginx_library_config.py; then
-	info_log "Nginx library config generated"
-else
-	warn_log "Failed to generate nginx library config — nginx /library/ locations may be missing"
-fi
-
 # main loop
 while ! ((exited)); do
 	watchdog_process_pid gunicorn

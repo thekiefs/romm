@@ -105,11 +105,19 @@ class RomFile(BaseModel):
 
     def resolve_absolute_path(self) -> str | None:
         """Return the absolute filesystem path for this ROM file, or None
-        if the library_id is no longer in config."""
+        if the library_id is no longer in config or the path contains
+        parent-directory traversal.
+
+        NOTE: This is a backend-level defense. A comprehensive fix should
+        also enforce path scoping at the nginx layer.
+        """
         from config.config_manager import config_manager as cm
+        from pathlib import Path
 
         lib_path = cm.get_library_path(self.library_id)
         if lib_path is None:
+            return None
+        if ".." in Path(self.full_path).parts:
             return None
         return f"{lib_path}/{self.full_path}"
 
@@ -334,11 +342,19 @@ class Rom(BaseModel):
 
     def resolve_absolute_path(self) -> str | None:
         """Return the absolute filesystem path for this ROM, or None if
-        the library_id is no longer in config."""
+        the library_id is no longer in config or the path contains
+        parent-directory traversal.
+
+        NOTE: This is a backend-level defense. A comprehensive fix should
+        also enforce path scoping at the nginx layer.
+        """
         from config.config_manager import config_manager as cm
+        from pathlib import Path
 
         lib_path = cm.get_library_path(self.library_id)
         if lib_path is None:
+            return None
+        if ".." in Path(self.full_path).parts:
             return None
         return f"{lib_path}/{self.full_path}"
 
